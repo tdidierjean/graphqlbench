@@ -8,8 +8,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
+	"time"
+
+	"gonum.org/v1/gonum/stat"
 )
+
+type RequestClient struct {
+	URL     string
+	Query   string
+	Verbose bool
+}
 
 type ConfigData struct {
 	URL         string   `json:"url"`
@@ -46,31 +56,79 @@ func ParseConfigFile(path string) (*ConfigData, error) {
 	return &configData, nil
 }
 
-func SendRequest(config *ConfigData) {
-
+func (r *RequestClient) sendRequest(fields []string, paramString string, sizeParam string, sizeValue int) {
 	type Wrapper struct {
 		OperationName *string   `json:"operationName"`
 		Variables     *struct{} `json:"variables"`
 		Query         *string   `json:"query"`
 	}
 
-	params := fmt.Sprintf("%s,%s:%d", config.ParamString, config.SizeParam, config.SizeValue)
+	params := fmt.Sprintf("%s,%s:%d", paramString, sizeParam, sizeValue)
 
-	body := fmt.Sprintf("{%s(%s){%s}}", config.Query, params, strings.Join(config.Fields, ","))
+	body := fmt.Sprintf("{%s(%s){%s}}", r.Query, params, strings.Join(fields, ","))
 	var variables struct{}
 	payload := Wrapper{nil, &variables, &body}
 	b, err := json.Marshal(payload)
 
-	fmt.Println(string(b))
+	if r.Verbose == true {
+		fmt.Println(string(b))
+	}
 
-	response, err := http.Post(config.URL, "application/json", bytes.NewBuffer(b))
+	response, err := http.Post(r.URL, "application/json", bytes.NewBuffer(b))
 
 	if err != nil {
 		fmt.Println(fmt.Errorf("%T %s", err, err))
-	} else {
+	} else if r.Verbose == true {
 		fmt.Println(response.StatusCode)
 		if b, err := ioutil.ReadAll(response.Body); err == nil {
 			fmt.Println(string(b))
 		}
 	}
+}
+
+func Benchmark(config *ConfigData) {
+	nRequests := 10
+	concurrency := 3
+	// - all fields
+	// - fields one by one
+	// - default count
+	// - various count values
+	// ==>> measure time
+	// ==>> async (how many simulatenous)
+
+	req := func(client *RequestClient, config *ConfigData, c chan time.Duration) {
+		start := time.Now()
+		client.sendRequest(config.Fields, config.ParamString, config.SizeParam, config.SizeValue)
+		c <- time.Since(start)
+	}
+
+	client := RequestClient{
+		config.URL,
+		config.Query,
+		false,
+	}
+
+	results := []float64{}
+
+	ch := make(chan time.Duration, concurrency)
+	n := nRequests
+	for n > 0 {
+		for i := 0; i < concurrency; i++ {
+			if n > 0 {
+				go req(&client, config, ch)
+				n--
+			}
+		}
+
+		for i := 0; i < concurrency; i++ {
+			if len(results) < nRequests {
+				results = append(results, float64(<-ch)/float64(time.Millisecond))
+			}
+		}
+	}
+
+	fmt.Println(results)
+	sort.Float64s(results)
+	fmt.Printf("Mean: %fms\n", stat.Mean(results, nil))
+	fmt.Printf("Median: %fms\n", stat.Quantile(0.5, stat.Empirical, results, nil))
 }

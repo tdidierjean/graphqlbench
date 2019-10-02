@@ -21,19 +21,11 @@ func main() {
 		return
 	}
 
-	asyncparser.SendRequest(config)
-
-	// readFile("")
-	// process("", []string{"", ""}, 1)
+	asyncparser.Benchmark(config)
 }
 
 func readFile(filePath string) {}
 
 func process(url string, fields []string, sizeParam int) {
 	return
-}
-
-func makeRequest(url string, fields []string, sizeParam int) {
-	// response, err := http.Get(fmt.Sprintf("%s/%s", url, accountID))
-	// response.StatusCode
 }
