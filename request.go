@@ -16,9 +16,11 @@ import (
 )
 
 type RequestClient struct {
-	URL     string
-	Query   string
-	Verbose bool
+	URL         string
+	Query       string
+	ParamString string
+	SizeParam   string
+	Verbose     bool
 }
 
 type ConfigData struct {
@@ -56,14 +58,14 @@ func ParseConfigFile(path string) (*ConfigData, error) {
 	return &configData, nil
 }
 
-func (r *RequestClient) sendRequest(fields []string, paramString string, sizeParam string, sizeValue int) {
+func (r *RequestClient) sendRequest(fields []string, sizeValue int) {
 	type Wrapper struct {
 		OperationName *string   `json:"operationName"`
 		Variables     *struct{} `json:"variables"`
 		Query         *string   `json:"query"`
 	}
 
-	params := fmt.Sprintf("%s,%s:%d", paramString, sizeParam, sizeValue)
+	params := fmt.Sprintf("%s,%s:%d", r.ParamString, r.SizeParam, sizeValue)
 
 	body := fmt.Sprintf("{%s(%s){%s}}", r.Query, params, strings.Join(fields, ","))
 	var variables struct{}
@@ -96,26 +98,64 @@ func Benchmark(config *ConfigData) {
 	// ==>> measure time
 	// ==>> async (how many simulatenous)
 
-	req := func(client *RequestClient, config *ConfigData, c chan time.Duration) {
-		start := time.Now()
-		client.sendRequest(config.Fields, config.ParamString, config.SizeParam, config.SizeValue)
-		c <- time.Since(start)
-	}
-
 	client := RequestClient{
 		config.URL,
 		config.Query,
+		config.ParamString,
+		config.SizeParam,
 		false,
 	}
 
+	ch := make(chan time.Duration, concurrency)
+
+	varyingSizeRequest := func(size int) []float64 {
+		return processRun(nRequests, concurrency, ch, func() {
+			sendBenchmarkedRequest(&client, config.Fields, size, ch)
+		})
+	}
+
+	min := 1
+	max := 10
+	for i := min; i <= max; i++ {
+		results := varyingSizeRequest(i)
+
+		fmt.Printf("For size = %d\n", i)
+		fmt.Println(results)
+		sort.Float64s(results)
+		fmt.Printf("Mean: %fms\n", stat.Mean(results, nil))
+		fmt.Printf("Median: %fms\n", stat.Quantile(0.5, stat.Empirical, results, nil))
+	}
+
+	// results := processRun(nRequests, concurrency, ch, func() {
+	// sendBenchmarkedRequest(&client, config.Fields, config.SizeValue, ch)
+	// })
+
+	// fmt.Println(results)
+	// sort.Float64s(results)
+	// fmt.Printf("Mean: %fms\n", stat.Mean(results, nil))
+	// fmt.Printf("Median: %fms\n", stat.Quantile(0.5, stat.Empirical, results, nil))
+}
+
+// func varyRequestSize(ch chan time.Duration, min int, max int, fun func(size int) []float64) []float64 {
+// 	for i := min; i <= max; i++ {
+// 		results := fun(1)
+// 	}
+// }
+
+func sendBenchmarkedRequest(client *RequestClient, fields []string, size int, c chan time.Duration) {
+	start := time.Now()
+	client.sendRequest(fields, size)
+	c <- time.Since(start)
+}
+
+func processRun(nRequests int, concurrency int, ch chan time.Duration, fun func()) []float64 {
 	results := []float64{}
 
-	ch := make(chan time.Duration, concurrency)
 	n := nRequests
 	for n > 0 {
 		for i := 0; i < concurrency; i++ {
 			if n > 0 {
-				go req(&client, config, ch)
+				go fun()
 				n--
 			}
 		}
@@ -127,8 +167,5 @@ func Benchmark(config *ConfigData) {
 		}
 	}
 
-	fmt.Println(results)
-	sort.Float64s(results)
-	fmt.Printf("Mean: %fms\n", stat.Mean(results, nil))
-	fmt.Printf("Median: %fms\n", stat.Quantile(0.5, stat.Empirical, results, nil))
+	return results
 }
