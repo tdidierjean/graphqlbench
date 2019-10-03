@@ -1,0 +1,11 @@
+{
+    "url": "http://localhost:8080/query",
+    "query": "exercises",
+    "paramString": "exerciseType: \"object\", withTranslations:false",
+    "fields": [
+        "question",
+        "hint"
+    ],
+    "sizeParam": "count",
+    "sizeValue": 10
+}
