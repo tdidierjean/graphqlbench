@@ -6,6 +6,8 @@ require (
 	github.com/ajstarks/svgo v0.0.0-20190826172357-de52242f3d65 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/jung-kurt/gofpdf v1.12.4 // indirect
+	github.com/mattn/go-runewidth v0.0.4 // indirect
+	github.com/olekukonko/tablewriter v0.0.1
 	github.com/phpdave11/gofpdi v1.0.8 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20190728182440-6a916e37a237 // indirect
 	github.com/stretchr/objx v0.2.0 // indirect
