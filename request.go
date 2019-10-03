@@ -8,11 +8,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
-
-	"gonum.org/v1/gonum/stat"
 )
 
 type RequestClient struct {
@@ -58,7 +55,7 @@ func ParseConfigFile(path string) (*ConfigData, error) {
 	return &configData, nil
 }
 
-func (r *RequestClient) sendRequest(fields []string, sizeValue int) {
+func (r *RequestClient) sendRequest(fields []string, sizeValue int) (int, error) {
 	type Wrapper struct {
 		OperationName *string   `json:"operationName"`
 		Variables     *struct{} `json:"variables"`
@@ -80,17 +77,20 @@ func (r *RequestClient) sendRequest(fields []string, sizeValue int) {
 
 	if err != nil {
 		fmt.Println(fmt.Errorf("%T %s", err, err))
+		return 0, err
 	} else if r.Verbose == true {
 		fmt.Println(response.StatusCode)
 		if b, err := ioutil.ReadAll(response.Body); err == nil {
 			fmt.Println(string(b))
 		}
 	}
+
+	return response.StatusCode, nil
 }
 
 func Benchmark(config *ConfigData) {
-	nRequests := 10
-	concurrency := 3
+	nRequests := 5
+	concurrency := 1
 	// - all fields
 	// - fields one by one
 	// - default count
@@ -106,6 +106,8 @@ func Benchmark(config *ConfigData) {
 		false,
 	}
 
+	formatter := NewFormatter()
+
 	ch := make(chan time.Duration, concurrency)
 
 	varyingSizeRequest := func(size int) []float64 {
@@ -115,32 +117,16 @@ func Benchmark(config *ConfigData) {
 	}
 
 	min := 1
-	max := 10
+	max := 15
 	for i := min; i <= max; i++ {
 		results := varyingSizeRequest(i)
+		formatter.AddSizeResults(i, results)
 
-		fmt.Printf("For size = %d\n", i)
-		fmt.Println(results)
-		sort.Float64s(results)
-		fmt.Printf("Mean: %fms\n", stat.Mean(results, nil))
-		fmt.Printf("Median: %fms\n", stat.Quantile(0.5, stat.Empirical, results, nil))
+		fmt.Printf("For size = %d, results in ms => %v\n", i, results)
 	}
 
-	// results := processRun(nRequests, concurrency, ch, func() {
-	// sendBenchmarkedRequest(&client, config.Fields, config.SizeValue, ch)
-	// })
-
-	// fmt.Println(results)
-	// sort.Float64s(results)
-	// fmt.Printf("Mean: %fms\n", stat.Mean(results, nil))
-	// fmt.Printf("Median: %fms\n", stat.Quantile(0.5, stat.Empirical, results, nil))
+	formatter.FormatSizes()
 }
-
-// func varyRequestSize(ch chan time.Duration, min int, max int, fun func(size int) []float64) []float64 {
-// 	for i := min; i <= max; i++ {
-// 		results := fun(1)
-// 	}
-// }
 
 func sendBenchmarkedRequest(client *RequestClient, fields []string, size int, c chan time.Duration) {
 	start := time.Now()
@@ -149,7 +135,7 @@ func sendBenchmarkedRequest(client *RequestClient, fields []string, size int, c 
 }
 
 func processRun(nRequests int, concurrency int, ch chan time.Duration, fun func()) []float64 {
-	results := []float64{}
+	results := make([]float64, 0, nRequests)
 
 	n := nRequests
 	for n > 0 {
