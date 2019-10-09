@@ -7,4 +7,7 @@ Check the `examples` folder for an example configuration file.
 
 Run with:
 
-`go run cmd/main.go examples/exercises.json`
+```
+go build cmd/main.go
+./main examples/exercises.json
+```
