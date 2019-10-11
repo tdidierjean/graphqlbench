@@ -49,12 +49,6 @@ func ParseConfigFile(path string) (*ConfigData, error) {
 func Benchmark(config *ConfigData) {
 	nRequests := 5
 	concurrency := 1
-	// - all fields
-	// - fields one by one
-	// - default count
-	// - various count values
-	// ==>> measure time
-	// ==>> async (how many simulatenous)
 
 	client := RequestClient{
 		config.URL,
