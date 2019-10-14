@@ -46,7 +46,7 @@ func ParseConfigFile(path string) (*ConfigData, error) {
 }
 
 // Benchmark runs a benchmark based on config data
-func Benchmark(config *ConfigData) {
+func Benchmark(config *ConfigData, verbose bool) {
 	nRequests := 5
 	concurrency := 1
 
@@ -55,7 +55,7 @@ func Benchmark(config *ConfigData) {
 		config.Query,
 		config.ParamString,
 		config.SizeParam,
-		false,
+		verbose,
 	}
 
 	formatter := NewFormatter()

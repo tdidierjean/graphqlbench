@@ -1,27 +1,25 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"os"
 
 	"github.com/tdidierjean/asyncparser"
 )
 
 func main() {
-	if len(os.Args) == 1 {
-		fmt.Println("Missing argument: path to config file")
-		return
-	}
+	var verbose = flag.Bool("verbose", false, "Show extra output")
+	var filePath = flag.String("file", "", "Path to config file")
+	flag.Parse()
 
-	filePath := os.Args[1]
-	config, err := asyncparser.ParseConfigFile(filePath)
+	config, err := asyncparser.ParseConfigFile(*filePath)
 
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	asyncparser.Benchmark(config)
+	asyncparser.Benchmark(config, *verbose)
 }
 
 func readFile(filePath string) {}
